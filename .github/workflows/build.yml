@@ -8,51 +8,29 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash -l {0}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: msys2/setup-msys2@v2
+      # conda-forge provides pre-built GTK3 + PyGObject for Windows,
+      # avoiding the need to build anything from source.
+      - uses: conda-incubator/setup-miniconda@v3
         with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            mingw-w64-x86_64-gtk3
-            mingw-w64-x86_64-python
-            mingw-w64-x86_64-python-gobject
-            mingw-w64-x86_64-python-pip
-            mingw-w64-x86_64-python-cairo
-            mingw-w64-x86_64-python-cffi
-            mingw-w64-x86_64-python-cryptography
-            mingw-w64-x86_64-adwaita-icon-theme
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-swig
+          python-version: "3.12"
+          channels: conda-forge
+          activate-environment: build
+          miniforge-version: latest
 
-      - name: Install Python packages
-        shell: msys2 {0}
+      - name: Install GTK3 stack (conda) and Python packages (pip)
         run: |
-          # Use a venv (avoids PEP 668 externally-managed error)
-          # --system-site-packages keeps pacman-installed gi/cairo/cffi/crypto
-          python -m venv --system-site-packages .venv
-          source .venv/bin/activate
-
-          # scikit-build-core is PyMuPDF's build backend;
-          # install it first so --no-build-isolation can find it
-          pip install scikit-build-core setuptools
-
-          # Build PyMuPDF from source using system cmake/ninja/swig
-          pip install --no-build-isolation PyMuPDF
-
-          # pyHanko (mostly pure-python) and PyInstaller
-          pip install "pyHanko[pkcs11]" pyinstaller
+          conda install -y pygobject gtk3 pycairo adwaita-icon-theme
+          pip install PyMuPDF "pyHanko[pkcs11]" pyinstaller
 
       - name: Build executable
-        shell: msys2 {0}
-        run: |
-          source .venv/bin/activate
-          python build_windows.py
+        run: python build_windows.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
